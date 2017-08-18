@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<!--
+/**
+ * Copyright © 2016 Magento. All rights reserved.
+ * See COPYING.txt for license details.
+ */
+-->
+<config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:module:Magento_Store:etc/config.xsd">
+    <default>
+        <payment>
+            <monetha_gateway>
+                <debug>1</debug>
+                <active>1</active>
+                <model>MonethaPaymentGatewayFacade</model>
+                <merchant_secret_id/>
+                <merchant_project_id/>
+                <merchant_return_url/>
+                <order_status>pending_payment</order_status>
+                <payment_action>authorize</payment_action>
+                <title>Payment method (Monetha Gateway)</title>
+                <currency>USD</currency>
+                <can_authorize>0</can_authorize>
+                <can_capture>0</can_capture>
+                <can_void>0</can_void>
+                <can_use_checkout>1</can_use_checkout>
+                <is_gateway>1</is_gateway>
+                <sort_order>1</sort_order>
+                <debugReplaceKeys>MERCHANT_KEY</debugReplaceKeys>
+                <paymentInfoKeys>FRAUD_MSG_LIST</paymentInfoKeys>
+                <privateInfoKeys>FRAUD_MSG_LIST</privateInfoKeys>
+            </monetha_gateway>
+        </payment>
+    </default>
+</config>
