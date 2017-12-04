@@ -2,7 +2,7 @@
 
 Monetha payment gateway integration with Magento 2
 
-Detailed install and configuration guide will be available on our website - http://www.monetha.io/en/mvp/
+Detailed install and configuration guide will be available on our website - http://ico.monetha.io/en/mvp/
 
 Contact email for your questions: team@monetha.io
 
