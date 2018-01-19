@@ -8,13 +8,15 @@ define(
     [
         'Magento_Checkout/js/view/payment/default',
         'Magento_Checkout/js/action/place-order',
-        'Magento_Checkout/js/checkout-data'
+        'Magento_Checkout/js/checkout-data',
+        'Magento_Ui/js/modal/alert'
     ],
     function (        
         Component,
         placeOrderAction,
         selectPaymentMethodAction,
         checkoutData,
+        alert,
         $) {
         'use strict';
 
@@ -51,63 +53,42 @@ define(
 
                     jQuery.when(placeOrder).fail(function () {
                         self.isPlaceOrderActionAllowed(true);
-                        console.log('Order failed');
+                        console.error('"MONETHA: Order failed');
                     }).done( function() {
                         var config = window.checkoutConfig.payment.monetha_gateway;
-                        if (config && 
-                            config.merchant_project_id !== "" &&
-                            config.merchant_secret_id !== "" &&
-                            config.merchant_return_url !== "") {
-                            
-                            
-                            
-                            
-                            var total = 0;
-                            var now = new Date();
-                            var warrantyValue = (new Date(now.getFullYear()+2,now.getMonth(), now.getDay())).toISOString();       
-                            var paymentItems = [];
-                            config.cart.items.forEach(function(item){
-                                var paymentItem = {
-                                    "name" : item.name, 
-                                    "quantity": item.quantity, 
-                                    "warranty": warrantyValue, 
-                                    "price": item.price, 
-                                    "subtotal": item.price * item.quantity, 
-                                    "total_tax": 0, 
-                                    "total": item.price * item.quantity
-                                };
-                                paymentItems.push(paymentItem);
-                            });
+                        if (config)
+                            if (config.monetha_error !== "") {
+                                console.error("MONETHA: " + config.monetha_error);
+                                jQuery('.mth-payment-method-messages').html(config.monetha_error);
+                                jQuery('.mth-payment-method-messages').show();
+                            }
+                            if (config.monetha_api !== "" &&
+                                config.monetha_token !== "") {
+                                var xhttp = new XMLHttpRequest(); 
+                                xhttp.open("GET", config.monetha_api+"v1/deals/execute?token="+config.monetha_token, true)
+                                xhttp.onreadystatechange = function(){
+                                    if (this.readyState == 4 && this.status == 201) {
+                                        var res = JSON.parse(this.responseText);
+                                        window.location.href = res.order.payment_url;
+                                    } else {
+                                        jQuery('.mth-payment-method-messages').html(this.responseText);
+                                        jQuery('.mth-payment-method-messages').show();
+                                    }
+                                }
+                                xhttp.send();
 
-                            var mageCacheStorage = JSON.parse(window.localStorage.getItem("mage-cache-storage"));
-                        
-                            if (mageCacheStorage === undefined) {
-                                console.error("MONETHA: Magento cache storage undefined");
-                                return;
-                            }        
-
-                            var cart = mageCacheStorage.cart;
-                            var params = "pid="+config.merchant_project_id; 
-                                params += "&secret="+config.merchant_secret_id; 
-                                params += "&oid="+cart.data_id;
-                                params +="&amount="+config.cart.grand_total;
-                                params +="&currency="+config.cart.currency; 
-                                params += "&return="+config.merchant_return_url;
-                                params += "&cancel=";
-                                params += "&callback=http://payment.monetha.io/monethabutton/callback";
-                                params +="&i_firstname=";
-                                params += "&i_lastname="+mageCacheStorage.customer.fullname;
-                                params += "&i_email=merchants@monetha.io";
-                                params +='&i_items='+JSON.stringify(paymentItems); 
-                                params += "&i_delivery=post";                            
-
-                            window.location.href = "https://payment.monetha.io/orders/add?"+params;
-
-                        } else {
-                            console.error("MONETHA: Payment method configuration not complete");
-                        }
+                            } else {
+                                console.error("MONETHA: Payment method configuration not complete");
+                                jQuery('.mth-payment-method-messages').html('Payment method configuration not complete');
+                                jQuery('.mth-payment-method-messages').show();
+                            }
                     });
-                    return true;
+                    if (window.checkoutConfig.payment.monetha_gateway.monetha_error === "") {
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }
                 }
                 return false;
             },

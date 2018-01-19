@@ -9,11 +9,11 @@
     <default>
         <payment>
             <monetha_gateway>
-                <debug>1</debug>
                 <active>1</active>
                 <model>MonethaPaymentGatewayFacade</model>
-                <merchant_secret_id/>
-                <merchant_project_id/>
+                <testmode>0</testmode>
+                <merchant_key/>
+                <merchant_secret/>
                 <merchant_return_url/>
                 <order_status>pending_payment</order_status>
                 <payment_action>authorize</payment_action>
