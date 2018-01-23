@@ -21,3 +21,5 @@ In order to to try our integration in test mode please make sure to check "TestM
 **Merchant Secret:** MONETHA_SANDBOX_SECRET
 
 When test mode is switched on all payment transactions will be made in Ropsten testnet. Make sure not to send money from Ropsten testnet wallet address.
+
+### If you have any questions or requests, feel free to ask them via support@monetha.io
