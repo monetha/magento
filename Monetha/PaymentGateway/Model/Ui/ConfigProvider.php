@@ -48,7 +48,7 @@ final class ConfigProvider implements ConfigProviderInterface
         $mthApi = "https://api.monetha.io/";
 
         if ($this->_method->getConfigData("testmode")) {
-            $mthApi = "https://api-sandbox.monetha.io/api/";
+            $mthApi = "https://api-sandbox.monetha.io/";
         }
 
         $items = [];
