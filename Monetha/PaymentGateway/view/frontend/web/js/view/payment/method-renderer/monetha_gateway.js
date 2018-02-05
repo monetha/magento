@@ -70,7 +70,7 @@ define(
                                     if (this.readyState == 4 && this.status == 201) {
                                         var res = JSON.parse(this.responseText);
                                         window.location.href = res.order.payment_url;
-                                    } else {
+                                    } else if (this.readyState == 4 && this.status >= 300) {
                                         jQuery('.mth-payment-method-messages').html(this.responseText);
                                         jQuery('.mth-payment-method-messages').show();
                                     }
