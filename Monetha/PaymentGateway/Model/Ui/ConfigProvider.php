@@ -41,7 +41,7 @@ final class ConfigProvider implements ConfigProviderInterface
      */
     public function getConfig()
     {
-
+        
         $this->_checkoutSession->getQuote()->reserveOrderId();
         $oid = $this->_checkoutSession->getQuote()->getReservedOrderId();
 
@@ -53,22 +53,22 @@ final class ConfigProvider implements ConfigProviderInterface
 
         $items = [];
 
-        $cartitems = $this->_quote->getAllItems();
-        $sum = 0;
-        foreach($cartitems as $item) {
+        $cartItems = $this->_quote->getAllItems();
+        $this->_quote->setTotalsCollectedFlag(false)->collectTotals();
+
+        foreach($cartItems as $item) {
             $li = [
                 'name' => $item->getName(),
                 'quantity' => $item->getQty(),
                 'amount_fiat' => $item->getPrice()
             ];
-            $sum = $sum + $item->getQty() * $item->getPrice();
             array_push($items, $li);
         }
         // Add shipping and taxes
         $shipping = [
             'name' => 'Shipping and taxes',
             'quantity' => 1,
-            'amount_fiat' => $this->_quote->getGrandTotal() - $sum
+            'amount_fiat' => $this->_quote->getGrandTotal() - $this->_quote->getSubtotal()
         ];
         array_push($items, $shipping);
 
@@ -93,7 +93,7 @@ final class ConfigProvider implements ConfigProviderInterface
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_CUSTOMREQUEST => "POST",
             CURLOPT_POSTFIELDS => json_encode($req, JSON_NUMERIC_CHECK),
-            CURLOPT_HTTPHEADER => array(
+            CURLOPT_HTTPHEADER =>  array(
                 "Cache-Control: no-cache",
                 "Content-Type: application/json",
                 "MTH-Deal-Signature: " . $this->_method->getConfigData("merchant_key") . ":" . $this->_method->getConfigData("merchant_secret")
@@ -103,24 +103,11 @@ final class ConfigProvider implements ConfigProviderInterface
         $res = curl_exec($chSign);
         $resStatus = curl_getinfo($chSign, CURLINFO_HTTP_CODE);
         $resJson = json_decode($res);
-        $this->_logger->info(json_encode($resStatus));
-        $this->_logger->info($this->_method->getConfigData("merchant_key") . ":" . $this->_method->getConfigData("merchant_secret"));
-        $this->_logger->info(json_encode($resJson));
-
     
-        if ($resStatus && $resStatus >= 400 ) {
-            $message = 'can not create an order - merchant invalid. Merchant must first signup at Monetha';
-            $this->_logger->error($message);
+        if ($resStatus && $resStatus != 200 ) {
+            $this->_logger->error("Monetha: could not prepare offer - ".$resStatus." " . $resJson);
             curl_close($chSign);
-            return [
-                'payment' => [
-                    self::CODE => [
-                        'monetha_api' => '',
-                        'monetha_token' => '',
-                        'monetha_error' => $resJson->error
-                    ]
-                ]
-            ];
+            return $this->handleError($resStatus, $resJson);
         } else {
             curl_close($chSign);
             if ($resJson && $resJson->token) {
@@ -133,19 +120,36 @@ final class ConfigProvider implements ConfigProviderInterface
                         ]
                     ]
                 ];
-            } else {
-                $message = 'can not create an order - could not retrieve deal token';
-                $this->_logger->error($message);
-                return [
-                    'payment' => [
-                        self::CODE => [
-                            'monetha_api' => '',
-                            'monetha_token' => '',
-                            'monetha_error' => $message
-                        ]
-                    ]
-                ];
             }
         }
+    }
+
+     // Method to handle error messages
+     private function handleError($status, $response) {
+        $message = '';
+        switch($status){
+            case 400:
+                $message = $response->error;
+                break;
+            case 502:
+                $message = 'something wrong have happened please contact Monetha support at support@monetha.io';
+                break;
+            case 503:
+                $message = 'service temporary unavailable please try to refresh the page and try again';
+                break;
+            default:
+                $message = 'can not create an order';
+                break;
+        }
+
+        return [
+            'payment' => [
+                self::CODE => [
+                    'monetha_api' => $mthApi,
+                    'monetha_token' => '',
+                    'monetha_error' => $message
+                ]
+            ]
+        ];
     }
 }
