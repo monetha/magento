@@ -14,6 +14,7 @@ Contact email for your questions: team@monetha.io
 5. Re-deploy static content of Magento in case if it missing after upgrade `php bin/magento setup:static-content:deploy`
 6. Configure merchant key, merchant secret, and payment method title in Magento Payment administration
 
+
 In order to to try our integration in test mode please make sure to check "TestMode" check mark and use merchant key and secret provided below:
 
 **Merchant Key:** MONETHA_SANDBOX_KEY
@@ -21,5 +22,6 @@ In order to to try our integration in test mode please make sure to check "TestM
 **Merchant Secret:** MONETHA_SANDBOX_SECRET
 
 When test mode is switched on all payment transactions will be made in Ropsten testnet. Make sure not to send money from Ropsten testnet wallet address.
+
 
 ### If you have any questions or requests, feel free to ask them via support@monetha.io
