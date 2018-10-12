@@ -1,10 +1,4 @@
 <?xml version="1.0"?>
-<!--
-/**
- * Copyright © 2016 Magento. All rights reserved.
- * See COPYING.txt for license details.
- */
--->
 
 <config xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="urn:magento:framework:Event/etc/events.xsd">
     <event name="payment_method_assign_data">
@@ -12,5 +6,8 @@
     </event>
     <event name="checkout_onepage_controller_success_action">
         <observer name="custom_frontend_observer" instance="Monetha\PaymentGateway\Observer\OrderPlaceAfter" />
+    </event>
+    <event name="order_cancel_after">
+        <observer name="order_cancel_after" instance="Monetha\PaymentGateway\Observer\OrderCancelAfter"/>
     </event>
 </config>

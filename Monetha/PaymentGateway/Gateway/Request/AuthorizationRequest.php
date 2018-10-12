@@ -12,61 +12,39 @@ use Magento\Payment\Gateway\Request\BuilderInterface;
 use Magento\Sales\Model\Order\Item\Interceptor;
 use Magento\Store\Model\StoreManagerInterface;
 use Magento\Store\Api\Data\StoreInterface;
+use Magento\Framework\Exception\ValidatorException;
+use Monetha\PaymentGateway\Consts\ApiType;
+use Monetha\PaymentGateway\Services\GatewayService;
 
 class AuthorizationRequest implements BuilderInterface
 {
     const CODE = 'monetha_gateway';
 
-    /**
-     * @var StoreInterface
-     */
     protected $store;
-
-    /**
-     * @var ConfigInterface
-     */
     private $config;
-
-    /**
-     * @var string
-     */
-    private $merchantKey = '';
-
-    /**
-     * @var string
-     */
+    private $apiKey = '';
     private $testMode = '';
-
-    /**
-     * @var string
-     */
     private $merchantSecret = '';
+    private $gatewayService;
 
     public function __construct(
         ConfigInterface $config,
-        StoreManagerInterface $storeManager
+        StoreManagerInterface $storeManager,
+        GatewayService $gatewayService
     ) {
         $this->config = $config;
-
-        $this->merchantKey = $this->config->getValue('merchant_key');
+        $this->apiKey = $this->config->getValue('mth_api_key');
         $this->merchantSecret = $this->config->getValue('merchant_secret');
         $this->testMode = $this->config->getValue('testmode');
-
         $this->store = $storeManager->getStore();
+        $this->gatewayService = $gatewayService;
     }
 
-    /**
-     * @param string $uri
-     * @param string $method
-     * @param array|null $body
-     *
-     * @return mixed
-     * @throws \Exception
-     */
-    private function callApi(string $uri, string $method = 'GET', array $body = null) {
-        $mthApi = "https://api.monetha.io/mth-gateway/";
+    private function callApi(string $uri, string $method = 'GET', array $body = null)
+    {
+        $mthApi = ApiType::PROD;
         if ($this->testMode) {
-            $mthApi = "https://api-sandbox.monetha.io/mth-gateway/";
+            $mthApi = ApiType::TEST;
         }
 
         $chSign = curl_init();
@@ -77,7 +55,7 @@ class AuthorizationRequest implements BuilderInterface
             CURLOPT_HTTPHEADER =>  array(
                 "Cache-Control: no-cache",
                 "Content-Type: application/json",
-                "MTH-Deal-Signature: " . $this->merchantKey . ":" . $this->merchantSecret
+                "Authorization: Bearer " . $this->apiKey
             ),
         ];
 
@@ -90,16 +68,21 @@ class AuthorizationRequest implements BuilderInterface
 
         $res = curl_exec($chSign);
         $error = curl_error($chSign);
+        $resStatus = curl_getinfo($chSign, CURLINFO_HTTP_CODE);
 
-        if ($error) {
-            //TODO: log
-            throw new \Exception($error);
+        if ($resStatus == 400
+            && isset($res)
+            && isset(json_decode($res)->code)
+            && json_decode($res)->code == 'AMOUNT_TOO_BIG') {
+            throw new ValidatorException(__('The value of your cart exceeds the maximum amount. Please remove some of the items from the cart.'));
         }
 
-        $resStatus = curl_getinfo($chSign, CURLINFO_HTTP_CODE);
+        if ($error) {
+            throw new ValidatorException(__($error));
+        }
+
         if ($resStatus < 200 || $resStatus >= 300) {
-            //TODO: log
-            throw new \Exception($res);
+            throw new ValidatorException(__($res));
         }
 
         $resJson = json_decode($res);
@@ -109,12 +92,13 @@ class AuthorizationRequest implements BuilderInterface
         return $resJson;
     }
 
-    private function createDeal(OrderAdapterInterface $order): array {
+    private function createDeal(OrderAdapterInterface $order): array
+    {
         $items = [];
         $cartItems = $order->getItems();
 
         $itemsPrice = 0;
-        foreach($cartItems as $item) {
+        foreach ($cartItems as $item) {
             /**
              * @var $item Interceptor
              */
@@ -148,46 +132,34 @@ class AuthorizationRequest implements BuilderInterface
                 'line_items' => $items
             ),
             'return_url' => $this->store->getBaseUrl(),
-            'callback_url' => 'https://www.monetha.io/callback',
-            'cancel_url' => 'https://www.monetha.io/cancel',
+            'callback_url' => $this->store->getBaseUrl() . 'rest/V1/monetha/action',
             'external_order_id' => $order->getOrderIncrementId() . " ",
         );
-
         return $deal;
     }
 
-    /**
-     * @param array $buildSubject
-     *
-     * @return array
-     * @throws \Exception
-     */
     public function build(array $buildSubject)
     {
         if (!isset($buildSubject['payment'])
             || !$buildSubject['payment'] instanceof PaymentDataObjectInterface
         ) {
-            throw new \InvalidArgumentException('Payment data object should be provided');
+            throw new ValidatorException(__('Payment data object should be provided'));
         }
 
-        /**
-         * @var $paymentDO PaymentDataObjectInterface
-         */
-        $paymentDO = $buildSubject['payment'];
-        $order = $paymentDO->getOrder();
-
-        $deal = $this->createDeal($order);
-
-        $address = $order->getShippingAddress();
-
-        $resJson = $this->callApi("v1/merchants/offer", 'POST', $deal);
-        $paymentUrl = '';
-        if ($resJson && $resJson->token) {
+        try {
+            $paymentDO = $buildSubject['payment'];
+            $order = $paymentDO->getOrder();
+            $offerBody = $this->createDeal($order);
+            $address = $order->getShippingAddress();
+            $resJson = $this->callApi("v1/merchants/offer_auth", 'POST', $offerBody);
+            $paymentUrl = '';
             $resJson = $this->callApi('v1/deals/execute?token=' . $resJson->token);
             $paymentUrl = $resJson->order->payment_url;
-
             $payment = $paymentDO->getPayment();
             $payment->setAdditionalInformation('paymentUrl', $paymentUrl);
+            $payment->setAdditionalInformation('external_order_id', $resJson->order->id);
+        } catch (\Exception $ex) {
+            throw new ValidatorException(__($ex->getMessage()));
         }
 
         return [
@@ -197,7 +169,7 @@ class AuthorizationRequest implements BuilderInterface
             'CURRENCY' => $order->getCurrencyCode(),
             'EMAIL' => $address->getEmail(),
             'MERCHANT_KEY' => $this->config->getValue(
-                'merchant_gateway_key',
+                'mth_api_key',
                 $order->getStoreId()
             ),
             'PAYMENT_URL' => $paymentUrl,

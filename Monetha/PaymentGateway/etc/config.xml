@@ -12,10 +12,10 @@
                 <active>0</active>
                 <model>MonethaPaymentGatewayFacade</model>
                 <testmode>0</testmode>
-                <merchant_key/>
+                <mth_api_key/>
                 <merchant_secret/>
+                <!-- <merchant_gateway_key backend_model="Magento\Config\Model\Config\Backend\Encrypted"/> -->
                 <merchant_return_url/>
-                <merchant_gateway_key backend_model="Magento\Config\Model\Config\Backend\Encrypted" />
                 <order_status>pending_payment</order_status>
                 <payment_action>authorize</payment_action>
                 <title>Monetha Gateway</title>

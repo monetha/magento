@@ -10,33 +10,36 @@ use Magento\Framework\Event\ObserverInterface;
 use Magento\Framework\App\ResponseFactory;
 use Magento\Framework\UrlInterface;
 use Magento\Sales\Model\OrderRepository;
+use Magento\Framework\Exception\ValidatorException;
+use Magento\Sales\Model\Service\InvoiceService;
+use Magento\Sales\Model\Order\Email\Sender\InvoiceSender;
 
 class OrderPlaceAfter implements ObserverInterface
 {
-    /**
-     * @var ResponseFactory
-     */
     protected $responseFactory;
-
-    /**
-     * @var UrlInterface
-     */
     protected $url;
-
-    /**
-     * @var OrderRepository
-     */
     protected $orderRepository;
+    protected $invoiceService;
+    protected $invoiceSender;
+    protected $registry;
+    protected $transaction;
 
     public function __construct(
         ResponseFactory $responseFactory,
         UrlInterface $url,
-        OrderRepository $orderRepository
-    )
-    {
+        OrderRepository $orderRepository,
+        InvoiceService $invoiceService,
+        InvoiceSender $invoiceSender,
+        \Magento\Framework\Registry $registry,
+        \Magento\Framework\DB\Transaction $transaction
+    ) {
         $this->responseFactory = $responseFactory;
         $this->url = $url;
         $this->orderRepository = $orderRepository;
+        $this->invoiceService = $invoiceService;
+        $this->invoiceSender = $invoiceSender;
+        $this->transaction = $transaction;
+        $this->registry = $registry;
     }
 
     public function execute(Observer $observer)
@@ -48,6 +51,19 @@ class OrderPlaceAfter implements ObserverInterface
             $order = $this->orderRepository->get($orderId);
             $payment = $order->getPayment();
             $paymentUrl = $payment->getAdditionalInformation('paymentUrl');
+
+            // Prepare invoice
+            $invoice = $this->invoiceService->prepareInvoice($order);
+            $invoice->register();
+            $invoice->save();
+
+            $transactionSave = $this->transaction->addObject(
+                $invoice
+            )->addObject(
+                $invoice->getOrder()
+            );
+
+            $transactionSave->save();
         }
 
         if ($paymentUrl) {

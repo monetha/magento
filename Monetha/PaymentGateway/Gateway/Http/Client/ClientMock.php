@@ -67,7 +67,6 @@ class ClientMock implements ClientInterface
      */
     protected function generateResponseForCode($resultCode)
     {
-
         return array_merge(
             [
                 'RESULT_CODE' => $resultCode,

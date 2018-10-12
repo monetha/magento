@@ -140,4 +140,6 @@
         </arguments>
     </type>
 
+    <preference for="Monetha\PaymentGateway\Api\GatewayInterface" type="Monetha\PaymentGateway\Model\Gateway" />
+
 </config>
