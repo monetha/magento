@@ -60,7 +60,13 @@ class AuthorizationRequest implements BuilderInterface
         ];
 
         if ($method !== 'GET' && $body) {
-            $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_NUMERIC_CHECK);
+            $client_uri = @end(explode('/',$uri));
+            if($client_uri == 'clients') {
+                $options[CURLOPT_POSTFIELDS] = json_encode($body);
+            } else {
+                $options[CURLOPT_POSTFIELDS] = json_encode($body, JSON_NUMERIC_CHECK);
+            }
+            
             $options[CURLOPT_CUSTOMREQUEST] = $method;
         }
 
@@ -70,11 +76,33 @@ class AuthorizationRequest implements BuilderInterface
         $error = curl_error($chSign);
         $resStatus = curl_getinfo($chSign, CURLINFO_HTTP_CODE);
 
-        if ($resStatus == 400
+        if (($resStatus >= 400)
             && isset($res)
-            && isset(json_decode($res)->code)
-            && json_decode($res)->code == 'AMOUNT_TOO_BIG') {
-            throw new ValidatorException(__('The value of your cart exceeds the maximum amount. Please remove some of the items from the cart.'));
+            && isset(json_decode($res)->code)) {
+            if(json_decode($res)->code == 'AMOUNT_TOO_BIG') {
+                throw new ValidatorException(__('The value of your cart exceeds the maximum amount. Please remove some of the items from the cart.'));
+            }
+            if(json_decode($res)->code == 'AMOUNT_TOO_SMALL') {
+                throw new ValidatorException(__('amount_fiat in body should be greater than or equal to 0.01'));
+            }
+            if(json_decode($res)->code == 'INVALID_PHONE_NUMBER') {
+                throw new ValidatorException(__('Invalid phone number'));
+            }
+            if(json_decode($res)->code == 'AUTH_TOKEN_INVALID') {
+                throw new ValidatorException(__('Monetha plugin setup is invalid, please contact merchant.'));
+            }
+            if(json_decode($res)->code == 'INTERNAL_ERROR') {
+                throw new ValidatorException(__('There\'s some internal server error, please contact merchant.'));
+            }
+            if(json_decode($res)->code == 'UNSUPPORTED_CURRENCY') {
+                throw new ValidatorException(__('Selected currency is not supported by monetha.'));
+            }
+            if(json_decode($res)->code == 'PROCESSOR_MISSING') {
+                throw new ValidatorException(__('Can\'t process order, please contact merchant.'));
+            }
+            if(json_decode($res)->code == 'INVALID_PHONE_COUNTRY_CODE') {
+                throw new ValidatorException(__('This country code is invalid, please input correct country code.'));
+            }
         }
 
         if ($error) {
@@ -103,6 +131,9 @@ class AuthorizationRequest implements BuilderInterface
              * @var $item Interceptor
              */
             $price = round($item->getPrice(), 2);
+            if (!$price) {
+                continue;
+            }
             $quantity = $item->getQtyOrdered();
             $li = [
                 'name' => $item->getName(),
@@ -123,13 +154,39 @@ class AuthorizationRequest implements BuilderInterface
             'quantity' => 1,
             'amount_fiat' => round($grandTotal - $itemsPrice, 2),
         ];
-        $items[] = $shipping;
+        if ($shipping['amount_fiat']) {
+            $items[] = $shipping;
+        }
+
+        $client_id = 0;
+        $billing_address = $order->getBillingAddress();
+
+        $phoneNumber = preg_replace('/\D/', '', $billing_address->getTelephone());
+
+        if($phoneNumber) {
+            $client_body = array(
+                "contact_name" => $billing_address->getFirstname() . " " .  $billing_address->getLastname(),
+                "contact_email" => $billing_address->getEmail(),
+                "contact_phone_number" => $phoneNumber,
+                "country_code_iso" => $billing_address->getCountryId(),
+                "zipcode" => $billing_address->getPostcode(),
+                "city" => $billing_address->getCity(),
+                "address" => $billing_address->getStreetLine1()
+            );
+
+            $resJson = $this->callApi("v1/clients", 'POST', $client_body);
+
+            if(isset($resJson->client_id)) {
+                $client_id = $resJson->client_id;
+            }
+        }
 
         $deal = array(
             'deal' => array(
                 'amount_fiat' => $grandTotal,
                 'currency_fiat' => $this->store->getCurrentCurrency()->getCode(),
-                'line_items' => $items
+                'line_items' => $items,
+                'client_id' => $client_id
             ),
             'return_url' => $this->store->getBaseUrl(),
             'callback_url' => $this->store->getBaseUrl() . 'rest/V1/monetha/action',
@@ -167,7 +224,7 @@ class AuthorizationRequest implements BuilderInterface
             'INVOICE' => $order->getOrderIncrementId(),
             'AMOUNT' => $order->getGrandTotalAmount(),
             'CURRENCY' => $order->getCurrencyCode(),
-            'EMAIL' => $address->getEmail(),
+            'EMAIL' => $address ? $address->getEmail() : null,
             'MERCHANT_KEY' => $this->config->getValue(
                 'mth_api_key',
                 $order->getStoreId()

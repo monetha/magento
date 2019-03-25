@@ -66,7 +66,10 @@ class GatewayService
                 'amount_fiat' => $price,
             ];
             $itemsPrice += $price * $quantity;
-            $items[] = $li;
+            if($price > 0)
+            {
+                $items[] = $li;
+            }
         }
 
         $itemsPrice = round($itemsPrice, 2);
@@ -79,7 +82,11 @@ class GatewayService
             'quantity' => 1,
             'amount_fiat' => round($grandTotal - $itemsPrice, 2),
         ];
-        $items[] = $shipping;
+
+        if($shipping['amount_fiat'] > 0)
+        {
+            $items[] = $shipping;
+        }
 
         $deal = array(
             'deal' => array(
@@ -118,6 +125,14 @@ class GatewayService
         return HttpService::callApi($apiUrl, 'POST', $body, ["Authorization: Bearer " . $this->mthApiKey]);
     }
 
+    public function createClient($clientBody)
+    {
+        $apiUrl = $this->getApiUrl();
+        $apiUrl = $apiUrl . 'v1/clients';
+
+        return HttpService::callApi($apiUrl, 'POST', $clientBody, ["Authorization: Bearer " . $this->mthApiKey]);
+    }
+
     public function createOffer($offerBody)
     {
         $apiUrl = $this->getApiUrl();
@@ -151,6 +166,10 @@ class GatewayService
                     case EventType::FINALIZED:
                         $this->setInvoicePaid($order);
                         $this->addOrderComment($order, 'Order has been successfully paid.');
+                        break;
+                    case EventType::MONEY_AUTHORIZED:
+                        $this->setInvoicePaid($order);
+                        $this->addOrderComment($order, 'Order has been successfully paid by card.');
                         break;
                     default:
                         throw new \Magento\Framework\Exception\InputException(__('Bad event type!'));

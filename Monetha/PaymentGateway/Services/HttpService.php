@@ -28,11 +28,36 @@ class HttpService
         $error = curl_error($chSign);
         $resStatus = curl_getinfo($chSign, CURLINFO_HTTP_CODE);
 
-        if ($resStatus == 400
+        if (($resStatus >= 400)
             && isset($res)
-            && isset(json_decode($res)->code)
-            && json_decode($res)->code == 'AMOUNT_TOO_BIG') {
-            throw new \Exception('The value of your cart exceeds the maximum amount. Please remove some of the items from the cart.');
+            && isset(json_decode($res)->code)) {
+            if(json_decode($res)->code == 'AMOUNT_TOO_BIG') {
+                throw new \Exception('The value of your cart exceeds the maximum amount. Please remove some of the items from the cart.');
+            }
+            if(json_decode($res)->code == 'AMOUNT_TOO_SMALL') {
+                throw new \Exception('amount_fiat in body should be greater than or equal to 0.01');
+            }
+            if(json_decode($res)->code == 'INVALID_PHONE_NUMBER') {
+                throw new \Exception('Invalid phone number');
+            }
+            if(json_decode($res)->code == 'AUTH_TOKEN_INVALID') {
+                throw new \Exception('Monetha plugin setup is invalid, please contact merchant.');
+            }
+            if(json_decode($res)->code == 'ACCESS_DENIED') {
+                throw new \Exception('Merchant secret or Monetha Api Key is not valid.');
+            }
+            if(json_decode($res)->code == 'INTERNAL_ERROR') {
+                throw new \Exception('There\'s some internal server error, please contact merchant.');
+            }
+            if(json_decode($res)->code == 'UNSUPPORTED_CURRENCY') {
+                throw new \Exception('Selected currency is not supported by monetha.');
+            }
+            if(json_decode($res)->code == 'PROCESSOR_MISSING') {
+                throw new \Exception('Can\'t process order, please contact merchant.');
+            }
+            if(json_decode($res)->code == 'INVALID_PHONE_COUNTRY_CODE') {
+                throw new \Exception('This country code is invalid, please input correct country code.');
+            }
         }
 
         if ($error) {

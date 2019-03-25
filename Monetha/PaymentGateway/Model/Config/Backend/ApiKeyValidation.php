@@ -49,7 +49,11 @@ class ApiKeyValidation extends \Magento\Framework\App\Config\Value
         $apiUrl = $apiUrl . 'v1/merchants/' . $merchantId .'/secret';
 
         $response = HttpService::callApi($apiUrl, 'GET', null, ["Authorization: Bearer " . $apiKey]);
-        return ($response && $response->integration_secret && $response->integration_secret == $secret);
+        if(isset($response->integration_secret))
+        {
+            return $response->integration_secret == $secret;
+        }
+        return false;
     }
 
     public function getMerchantId($apiKey)
@@ -59,12 +63,25 @@ class ApiKeyValidation extends \Magento\Framework\App\Config\Value
             throw new ValidatorException(__('Invalid Api key!'));
         }
         list($headb64, $bodyb64, $cryptob64) = $tks;
-        $payload = JWT::jsonDecode(JWT::urlsafeB64Decode($bodyb64));
+
+        if($this->isJson(JWT::urlsafeB64Decode($bodyb64)))
+        {
+            $payload = JWT::jsonDecode(JWT::urlsafeB64Decode($bodyb64));
+        }
+        else
+        {
+            throw new ValidatorException(__('Merchant secret or Monetha Api Key is not valid.'));
+        }
 
         if (isset($payload->mid)) {
             return $payload->mid;
         }
 
         throw new ValidatorException(__('Invalid Api key!'));
+    }
+
+    public function isJson($str) {
+        $json = json_decode($str);
+        return $json && $str != $json;
     }
 }
