@@ -4,14 +4,15 @@ namespace Monetha\PaymentGateway\Observer;
 
 use Magento\Framework\Event\Observer;
 use Magento\Framework\Event\ObserverInterface;
-use Magento\Framework\Model\AbstractModel;
-use Monetha\PaymentGateway\Services\HttpService;
-use Monetha\PaymentGateway\Consts\ApiType;
+use Monetha\Adapter\ConfigAdapterInterface;
+use Monetha\ConfigAdapterTrait;
 use Magento\Store\Model\ScopeInterface;
-use Magento\Framework\Exception\ValidatorException;
+use Monetha\Services\GatewayService;
 
-class OrderCancelAfter implements ObserverInterface
+class OrderCancelAfter implements ObserverInterface, ConfigAdapterInterface
 {
+    use ConfigAdapterTrait;
+
     protected $scopeConfig;
 
     public function __construct(
@@ -27,29 +28,24 @@ class OrderCancelAfter implements ObserverInterface
         $payment = $order->getPayment();
         $paymentMethod = $payment->getMethod();
         if ($paymentMethod == 'monetha_gateway') {
-            $this->cancelExternalOrder($order, $payment);
+            $this->cancelExternalOrder($payment);
         }
 
         return $this;
     }
 
-    public function cancelExternalOrder($order, $payment)
+    public function cancelExternalOrder($payment)
     {
         try {
-            $apiKey = $this->scopeConfig->getValue('payment/monetha_gateway/mth_api_key', \Magento\Store\Model\ScopeInterface::SCOPE_STORE);
-            $testMode = $this->scopeConfig->getValue('payment/monetha_gateway/testmode', \Magento\Store\Model\ScopeInterface::SCOPE_STORE);
-            $apiUrl = ApiType::PROD;
-
-            if ($testMode == 1) {
-                $apiUrl = ApiType::TEST;
-            }
+            $this->merchantSecret = $this->scopeConfig->getValue('payment/monetha_gateway/merchant_secret', ScopeInterface::SCOPE_STORE);
+            $this->monethaApiKey = $this->scopeConfig->getValue('payment/monetha_gateway/mth_api_key', ScopeInterface::SCOPE_STORE);
+            $this->testMode = $this->scopeConfig->getValue('payment/monetha_gateway/testmode');
 
             $externalOrderId = $payment->getAdditionalInformation('external_order_id');
 
             if (isset($externalOrderId)) {
-                $apiUrl = $apiUrl . 'v1/orders/' . $externalOrderId .'/cancel';
-                $body = ['cancel_reason' => 'Order was cancelled from e-shop.'];
-                $response = HttpService::callApi($apiUrl, 'POST', $body, ["Authorization: Bearer " . $apiKey]);
+                $gs = new GatewayService($this);
+                $gs->cancelExternalOrder($externalOrderId);
             }
         } catch (\Exception $ex) {
         }

@@ -4,7 +4,7 @@ namespace Monetha\PaymentGateway\Model;
 use \Magento\Framework\Webapi\Rest\Request;
 use Monetha\PaymentGateway\Api\GatewayInterface;
 use Monetha\PaymentGateway\Services\GatewayService;
-use Monetha\PaymentGateway\Consts\EventType;
+use Monetha\Response\Exception\ValidationException;
 
 class Gateway implements GatewayInterface
 {
@@ -30,19 +30,22 @@ class Gateway implements GatewayInterface
     public function processAction()
     {
         $signature = $this->request->getHeader('mth_signature');
-        $body = $this->request->getContent();
-        $data = json_decode($body);
+        $bodyString = $this->request->getContent();
+        $data = json_decode($bodyString);
+        $this->gatewayService->setOrder($data->payload->external_order_id);
 
-        if ($data->event == EventType::PING) {
+        try {
+            $result = $this->gatewayService->processWebHook($this->gatewayService, $bodyString, $signature);
+        } catch(ValidationException $e) {
+            throw new \Magento\Framework\Exception\InputException(__($e->getMessage()));
+        }
+
+        if ($result) {
             return [
                 'message' => 'e-shop healthy'
             ];
         }
 
-        if ($this->gatewayService->validateSignature($signature, $body)) {
-            return $this->gatewayService->processAction($data);
-        } else {
-            throw new \Magento\Framework\Exception\InputException(__('Bad signature'));
-        }
+        throw new \Magento\Framework\Exception\InputException(__('Something went wrong.'));
     }
 }
