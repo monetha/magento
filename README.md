@@ -23,8 +23,6 @@ Issues that you may encounter on the 2-3 steps can be related with outdated buil
 
 In this case download newest composer.phar and run it instead like `php /path/to/composer.phar ...` or just `composer ...` if you have it in your $PATH).
 
-Gitlab repository mentioned above is public, in case of composer requires authorization, please register https://gitlab.com/users/sign_in 
-
 In order to to try our integration in test mode please make sure to check "TestMode" check mark and use merchant key and secret provided below:
 
 **Merchant Key:** MONETHA_SANDBOX_KEY
