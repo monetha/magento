@@ -9,7 +9,7 @@ Contact email for your questions: team@monetha.io
 # Technical guide
 1. Copy Monetha folder into `app/code`
 2. `php ./vendor/composer/composer/bin/composer config repositories.monetha/payment-plugin-php-sdk vcs https://github.com/monetha/payment-plugin-php-sdk.git`
-3. `php ./vendor/composer/composer/bin/composer require monetha/payment-plugin-php-sdk:dev-master` 
+3. `php ./vendor/composer/composer/bin/composer require monetha/payment-plugin-php-sdk:1.0.7` 
 (in case if you're updating the plugin version, run `php ./vendor/composer/composer/bin/composer update monetha/payment-plugin-php-sdk`) instead
 4. Disable Magento cache with `php bin/magento cache:disable`
 5. Install the extension with `php bin/magento setup:upgrade`
